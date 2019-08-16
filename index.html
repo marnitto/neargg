@@ -36,6 +36,10 @@
 #result {
   opacity: 0;
 }
+
+#map_table {
+  margin: auto;
+}
 </style>
 </head>
 <body>
@@ -43,18 +47,51 @@
 <div id="loader"></div>
 <div id="result">
   <div id="map" style="width:100%; height:700px; "></div>
+  <table id="map_table">
+    <thead>
+      <tr>
+        <th>가맹점명</th>
+        <th>주소</th>
+        <th>거리 (m)</th>
+      </tr>
+    </thead>
+    <tbody id="map_table_data">
+    </tbody>
+  </table>
 </div>
 
 
 <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
 <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0502eacb9cea2f113c3970f669e9d900"></script>
 <script>
+// CONFIG
+var DEBUG = false;
+var ENDPOINT = 'https://flgrdqzv5j.execute-api.ap-northeast-2.amazonaws.com/production';
 var selectedMarker = null;
 var selectedInfoWindow = null;
+var defaultMarkerImage  = new kakao.maps.MarkerImage(
+  'http://t1.daumcdn.net/mapjsapi/images/marker.png',
+  new kakao.maps.Size(29, 42)
+);
+// https://www.iconfinder.com/icons/299087/map_marker_icon
+var selectedMarkerImage = new kakao.maps.MarkerImage(
+  '/images/marker-red.png',
+  new kakao.maps.Size(42, 42)
+);
+var markerInfo = {};
+
+
+var start = new Date().getTime();
+function log(message) {
+  if (!DEBUG) return;
+  var timediff = new Date().getTime() - start;
+  console.log('['+timediff/1000.0+'] '+message);
+}
+
 
 function drawNearbyMe(lat, lng) {
   new Promise(function (resolve, reject) {
-        $.getJSON("https://flgrdqzv5j.execute-api.ap-northeast-2.amazonaws.com/production/near?lat="+lat+"&lng="+lng, function (response) {
+        $.getJSON(ENDPOINT + "/near?lat="+lat+"&lng="+lng, function (response) {
             if (response) { 
                 resolve(response);
                 return;
@@ -63,21 +100,46 @@ function drawNearbyMe(lat, lng) {
         });
 
   }).then(function (result) {
-    console.log('[+] len(result) = ' + result.length);
-    result.map(function (r) {
-      console.log('[+] name='+r['name']+' address='+r['address']);
-    });
+    if (DEBUG) {
+      log('len(result) = ' + result.length);
+      // result.map(function (r) {
+      //   log('  name='+r['name']+' address='+r['address']);
+      // });
+    }    
+    return result;
+
+  }).then(function (result) {
+    // draw table
+    var table = document.getElementById("map_table_data");
+    for (var i=0; i<result.length; i++) {
+      var names = result[i].name.split('|').map(function (n) {
+        return '<a href="#" class="map_shop">'+n+'</a>';
+      }).join('<br>');
+      var data_line = [
+        result[i].address,
+        Math.round(result[i].distance*1000)
+      ];
+      
+      var row = table.insertRow(-1);
+      row.insertCell(0).innerHTML = names;
+      for (var j=0; j<data_line.length; j++) {
+        var col = row.insertCell(j+1);
+        col.innerText = data_line[j];
+      }
+      $(row).attr('data-lat', result[i].latitude);
+      $(row).attr('data-lng', result[i].longitude);
+    }
 
     return result;
 
   }).then(function (result) {
+    // show map
     var mapContainer = document.getElementById('map'),
         mapOption = { 
             center: new kakao.maps.LatLng(lat, lng),
             level: 3,
             // disableDoubleClick: true
         };
-
     var map = new kakao.maps.Map(mapContainer, mapOption);
     var positions = result.map(function (r) {
       return {
@@ -89,48 +151,67 @@ function drawNearbyMe(lat, lng) {
     for (var i = 0; i < positions.length; i ++) {
         var marker = new kakao.maps.Marker({
             map: map,
-            position: positions[i].latlng
+            position: positions[i].latlng,
+            image: defaultMarkerImage
         });
 
         var infowindow = new kakao.maps.InfoWindow({
             content: '<div>'+positions[i].content.split('|').join('<br>')+'</div>'
         });
 
-        kakao.maps.event.addListener(marker, 'mouseover', makeOverListener(map, marker, infowindow));
-        kakao.maps.event.addListener(marker, 'mouseout', makeOutListener(infowindow));
-        // kakao.maps.event.addListener(marker, 'click', makeClickListener(map, marker, infowindow));
-    }
+        markerInfo[[positions[i].latlng.getLat(), positions[i].latlng.getLng()]] = 
+          {'marker': marker, 'infowindow': infowindow};
 
-    function makeOverListener(map, marker, infowindow) {
-        return function() {
-            infowindow.open(map, marker);
-        };
-    }
-
-    function makeOutListener(infowindow) {
-        return function() {
-          infowindow.close();
-        };
+        kakao.maps.event.addListener(marker, 'click', makeClickListener(map, marker, infowindow));
     }
 
     function makeClickListener(map, marker, infowindow) {
       return function () {
-        console.log('makeClickListener');
         if (selectedMarker == marker) return;
 
         if (selectedMarker) {
+          selectedMarker.setImage(defaultMarkerImage);
           selectedInfoWindow.close();
         }
 
         selectedMarker = marker;
         selectedInfoWindow = infowindow;
+        selectedMarker.setImage(selectedMarkerImage);
         infowindow.open(map, marker);
       };
     }
 
-  }).then(function (result) {
+    return map;
+
+  }).then(function (map) {
+    // hook
+    $(".map_shop").click(function () {
+      var tr = $(this).parent().parent();
+      
+      var lat = tr.attr('data-lat'), lng = tr.attr('data-lng');
+      if (lat === undefined || lng === undefined) {
+        throw new Error("Selected element have no lat/lng info");
+      }
+
+      map.setCenter(new kakao.maps.LatLng(lat, lng));
+      var info = markerInfo[[lat, lng]];
+      kakao.maps.event.trigger(info.marker, 'click', null);
+    });
+  }).catch (function (e) {
+    console.log(e);
+  }).then(function () {
+    // Everything is done, show result
     $("#result").css("opacity", 100);
     $("#loader").hide();
+  });
+}
+
+
+function main() {
+  navigator.geolocation.getCurrentPosition(function(position) {
+    log('geolocation.getCurrentPosition()');
+    var geoloc = {'lat': position.coords.latitude, 'lng': position.coords.longitude};
+    drawNearbyMe(geoloc['lat'], geoloc['lng']);
   });
 }
 
@@ -141,21 +222,14 @@ function getMyLocation() {
 }
 
 
-function main() {
-  navigator.geolocation.getCurrentPosition(function(position) {
-    var geoloc = {'lat': position.coords.latitude, 'lng': position.coords.longitude};
-    console.log(geoloc);
-    drawNearbyMe(geoloc['lat'], geoloc['lng']);
-  });
-}
-
 
 function test() {
   var geoloc = getMyLocation();
+  log('geolocation.getCurrentPosition()');
   drawNearbyMe(geoloc['lat'], geoloc['lng']);
 }
 
-$(document).ready(test);
+$(document).ready(DEBUG? test: main);
 
 
 </script>
