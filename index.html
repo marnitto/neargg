@@ -40,6 +40,10 @@
 #map_table {
   margin: auto;
 }
+
+.map_table_data {
+  text-decoration: none;
+}
 </style>
 </head>
 <body>
@@ -113,7 +117,7 @@ function drawNearbyMe(lat, lng) {
     var table = document.getElementById("map_table_data");
     for (var i=0; i<result.length; i++) {
       var names = result[i].name.split('|').map(function (n) {
-        return '<a href="#" class="map_shop">'+n+'</a>';
+        return '<a class="map_shop">'+n+'</a>';
       }).join('<br>');
       var data_line = [
         result[i].address,
@@ -186,6 +190,9 @@ function drawNearbyMe(lat, lng) {
   }).then(function (map) {
     // hook
     $(".map_shop").click(function () {
+      $(".map_shop").css('text-decoration', 'none');
+      $(this).css('text-decoration', 'underline');
+
       var tr = $(this).parent().parent();
       
       var lat = tr.attr('data-lat'), lng = tr.attr('data-lng');
