@@ -54,7 +54,7 @@ var selectedInfoWindow = null;
 
 function drawNearbyMe(lat, lng) {
   new Promise(function (resolve, reject) {
-        $.getJSON("https://gb0hbh2wme.execute-api.ap-northeast-2.amazonaws.com/dev/near?lat="+lat+"&lng="+lng, function (response) {
+        $.getJSON("https://flgrdqzv5j.execute-api.ap-northeast-2.amazonaws.com/production/near?lat="+lat+"&lng="+lng, function (response) {
             if (response) { 
                 resolve(response);
                 return;
