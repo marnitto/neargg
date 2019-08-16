@@ -184,14 +184,14 @@ function drawNearbyMe(lat, lng) {
     }
 
     kakao.maps.event.addListener(map, 'center_changed', function () {
-      if (map.getLevel() > 2) return;
+      if (map.getLevel() > 3) return;
 
       var center = map.getCenter();
       var center_diff = Math.sqrt(
         Math.pow(center.getLat() - currentCenter.lat, 2) +
         Math.pow(center.getLng() - currentCenter.lng, 2)
       );
-      if (center_diff < 0.003) return;
+      if (center_diff < 0.002) return;
 
       if (triggerUpdate !== null) clearTimeout(triggerUpdate);
       triggerUpdate = window.setTimeout(
