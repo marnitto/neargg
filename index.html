@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>내 주변 경기지역화폐</title>
+
+<style type="text/css">
+/* loader */
+#loader {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  width: 150px;
+  height: 150px;
+  margin: -75px 0 0 -75px;
+  border: 16px solid #f3f3f3;
+  border-radius: 50%;
+  border-top: 16px solid #666666;
+  width: 120px;
+  height: 120px;
+  -webkit-animation: spin 2s linear infinite;
+  animation: spin 2s linear infinite;
+}
+
+@-webkit-keyframes spin {
+  0% { -webkit-transform: rotate(0deg); }
+  100% { -webkit-transform: rotate(360deg); }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* map */
+#result {
+  opacity: 0;
+}
+</style>
+</head>
+<body>
+
+<div id="loader"></div>
+<div id="result">
+  <div id="map" style="width:100%; height:700px; "></div>
+</div>
+
+
+<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0502eacb9cea2f113c3970f669e9d900"></script>
+<script>
+var selectedMarker = null;
+var selectedInfoWindow = null;
+
+function drawNearbyMe(lat, lng) {
+  new Promise(function (resolve, reject) {
+        $.getJSON("https://gb0hbh2wme.execute-api.ap-northeast-2.amazonaws.com/dev/near?lat="+lat+"&lng="+lng, function (response) {
+            if (response) { 
+                resolve(response);
+                return;
+            }
+            reject(new Error("Request is failed"));
+        });
+
+  }).then(function (result) {
+    console.log('[+] len(result) = ' + result.length);
+    result.map(function (r) {
+      console.log('[+] name='+r['name']+' address='+r['address']);
+    });
+
+    return result;
+
+  }).then(function (result) {
+    var mapContainer = document.getElementById('map'),
+        mapOption = { 
+            center: new kakao.maps.LatLng(lat, lng),
+            level: 3,
+            // disableDoubleClick: true
+        };
+
+    var map = new kakao.maps.Map(mapContainer, mapOption);
+    var positions = result.map(function (r) {
+      return {
+        content: '<div>'+r['name']+' ('+Math.round(r['distance']*1000)+'m)</div>',
+        latlng: new kakao.maps.LatLng(r['latitude'], r['longitude'])
+      }
+    });
+
+    for (var i = 0; i < positions.length; i ++) {
+        var marker = new kakao.maps.Marker({
+            map: map,
+            position: positions[i].latlng
+        });
+
+        var infowindow = new kakao.maps.InfoWindow({
+            content: '<div>'+positions[i].content.split('|').join('<br>')+'</div>'
+        });
+
+        kakao.maps.event.addListener(marker, 'mouseover', makeOverListener(map, marker, infowindow));
+        kakao.maps.event.addListener(marker, 'mouseout', makeOutListener(infowindow));
+        // kakao.maps.event.addListener(marker, 'click', makeClickListener(map, marker, infowindow));
+    }
+
+    function makeOverListener(map, marker, infowindow) {
+        return function() {
+            infowindow.open(map, marker);
+        };
+    }
+
+    function makeOutListener(infowindow) {
+        return function() {
+          infowindow.close();
+        };
+    }
+
+    function makeClickListener(map, marker, infowindow) {
+      return function () {
+        console.log('makeClickListener');
+        if (selectedMarker == marker) return;
+
+        if (selectedMarker) {
+          selectedInfoWindow.close();
+        }
+
+        selectedMarker = marker;
+        selectedInfoWindow = infowindow;
+        infowindow.open(map, marker);
+      };
+    }
+
+  }).then(function (result) {
+    $("#result").css("opacity", 100);
+    $("#loader").hide();
+  });
+}
+
+
+function getMyLocation() {
+  return {'lat': 37.3290642, 'lng': 127.1235776};  // (테스트) 고은푸드서비스
+  // return {'lat': 37.2616037, 'lng': 127.0285795};  // (테스트)스타벅스 수원시청역점
+}
+
+
+function main() {
+  navigator.geolocation.getCurrentPosition(function(position) {
+    var geoloc = {'lat': position.coords.latitude, 'lng': position.coords.longitude};
+    console.log(geoloc);
+    drawNearbyMe(geoloc['lat'], geoloc['lng']);
+  });
+}
+
+
+function test() {
+  var geoloc = getMyLocation();
+  drawNearbyMe(geoloc['lat'], geoloc['lng']);
+}
+
+$(document).ready(test);
+
+
+</script>
+
+
+</body>
+</html>
