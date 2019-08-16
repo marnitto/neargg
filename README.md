@@ -1,6 +1,6 @@
 neargg
 ==========
-내 주변 경기지역화폐 가맹점 검색 서비스
+내 주변 경기지역화폐 가맹점 검색 서비스 https://marnitto.github.io/neargg/
 
 경기도청에서 지원하는 [경기지역화폐](https://www.gg.go.kr/gg_localcurrency)를 사용하실 수
 있는, 사용자 주변 가맹점을 지도 형식으로 보여줍니다.
